@@ -1,0 +1,26 @@
+{
+  "name": "autokomplete",
+  "version": "0.0.1",
+  "description": "A fast, lightweight autocomplete module that linearly scales with large amounts of data",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kha-ld/autokomplete.git"
+  },
+  "keywords": [
+    "autocomplete",
+    "fast",
+    "scalable",
+    "suffix",
+    "immutable"
+  ],
+  "author": "kha-ld",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/kha-ld/autokomplete/issues"
+  },
+  "homepage": "https://github.com/kha-ld/autokomplete#readme"
+}
