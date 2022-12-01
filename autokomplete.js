@@ -1,7 +1,16 @@
-function autocomplete(input) {
-  let { suffixArray, inputIndex } = build(input);
-  return { match, insert, inputIndex, remove };
+import './typedef'
 
+/**
+ * Build and return an autocomplete model based on an array of entry objects.
+ *
+ * Each entry must have a **'string'** property.
+ * @param {entry[]} entries - An array of entry objects.
+ *
+ * Entry objects get returned when autocompleting.
+ *
+ * Each must contain a **'string'** property.
+ * @returns {autocompleter}
+ */
 function autocompleter(entries) {
   let { suffixArray, entryIndex } = build(entries);
   const entryCopy = JSON.parse(JSON.stringify(entries))
@@ -155,6 +164,20 @@ function autocompleter(entries) {
     }
   }
 
+  /**
+   * @global
+   * @function remove
+   * Remove entries from the model, returning a new model.
+   *
+   * Removal can be done through different methods.
+   * @param {Object} Methods Object with the removal methods to apply
+   * @param {String[]} Methods.strings An array of strings where any entry with a matching **string** property will be removed.
+   * @param {entry[]} Methods.entries An array of entries where any matching entry will be removed.
+   *
+   * Property order matters in deeper object levels, and doesn't account for function properties.
+   * @param {function[]} Methods.filters Filter functions to pass each entry though and remove ones that return **true**.
+   * @returns 
+   */
   function remove({ strings, entries, filters }) {
     let sortedEntryStrings;
     if (entries) {
@@ -176,7 +199,7 @@ function autocompleter(entries) {
         if (sortedEntryStrings.includes(sortedEntry)) return false;
       }
       return true
-      });
+    });
     return autocompleter(newEntries);
 
     function sortProps(entry) {
@@ -186,12 +209,22 @@ function autocompleter(entries) {
     }
   }
 
+  /**
+   * Create a new autocompleter instance with current model's entries and an array of new entries.
+   * @param {entry[]} entries
+   * @returns
+   */
   function insert(entries) {
     if (!entries instanceof Array) entries = [entries];
     let newEntries = Object.values(entryIndex).concat(entries);
     return autocompleter(newEntries);
   }
 
+  /**
+   * Autocomplete a query and return all matching entries in the model.
+   * @param {String} query Input query to autocomplete
+   * @returns {entry[]}
+   */
   function match(query) {
     query = query.toLowerCase();
     const { rowPos, matchIndex } = binarySearch(query);
