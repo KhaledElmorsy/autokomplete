@@ -180,19 +180,21 @@ function autocomplete(input) {
 
   function match(query) {
     query = query.toLowerCase();
-    const { row, matchIndex } = binarySearch(query);
+    const { rowPos, matchIndex } = binarySearch(query);
     if (matchIndex === -1) return [];
-    const matches = [row];
-    return matches.concat(farmMatches(query, matchIndex));
+    let matches = [rowPos];
+    matches = matches.concat(farmMatches(query, matchIndex));
+    const uniqueMatches = [...new Set(matches)];
+    return uniqueMatches.map(rowPos => entryIndex[rowPos])
 
     function binarySearch(query, start = 0, end = suffixArray.length - 1) {
       if (start > end) return { row: null, matchIndex: -1 };
       const midpoint = start + ((end - start) >> 1);
       const suffixPos = suffixArray[midpoint];
-      const { suffix, row } = getSuffixInfo(suffixPos);
+      const { suffix, rowPos } = getSuffixInfo(suffixPos);
       const suffixMatches = matchSuffix(query, suffix);
       if (suffixMatches) {
-        return { row, matchIndex: midpoint };
+        return { rowPos, matchIndex: midpoint };
       } else {
         [start, end] =
           query < suffix ? [start, midpoint - 1] : [midpoint + 1, end];
@@ -203,22 +205,22 @@ function autocomplete(input) {
     function farmMatches(query, startIndex) {
       const matches = [];
       for (let i = startIndex + 1; i < suffixArray.length; i++) {
-        const row = matchRow(query, i);
-        if (!row) break;
-        matches.push(row);
+        const rowPos = matchRow(query, i);
+        if (!rowPos) break;
+        matches.push(rowPos);
       }
       for (let i = startIndex - 1; i >= 0; i--) {
-        const row = matchRow(query, i);
-        if (!row) break;
-        matches.push(row);
+        const rowPos = matchRow(query, i);
+        if (!rowPos) break;
+        matches.push(rowPos);
       }
       return matches;
 
       function matchRow(query, index) {
         const suffixPos = suffixArray[index];
-        const { row, suffix } = getSuffixInfo(suffixPos);
+        const { rowPos, suffix } = getSuffixInfo(suffixPos);
         if (matchSuffix(query, suffix)) {
-          return row;
+          return rowPos;
         }
       }
     }
@@ -232,7 +234,7 @@ function autocomplete(input) {
       function getRow(suffixPos) {
         let rowPos = suffixPos;
         let row;
-        while (!(row = inputIndex[rowPos])) {
+        while (!(row = entryIndex[rowPos])) {
           rowPos--;
         }
         return { rowPos, row };
