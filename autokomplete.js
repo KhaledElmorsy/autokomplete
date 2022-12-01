@@ -2,33 +2,39 @@ function autocomplete(input) {
   let { suffixArray, inputIndex } = build(input);
   return { match, insert, inputIndex, remove };
 
-  function build(input) {
-    preprocess(input);
-    const initialArray = getInitialArray(input);
-    const suffixArray = getSuffixArray(initialArray);
-    const inputIndex = getInputIndex(input);
+function autocompleter(entries) {
+  let { suffixArray, entryIndex } = build(entries);
+  const entryCopy = JSON.parse(JSON.stringify(entries))
+  /** @type {string} */
+  return { match, insert, entries: entryCopy, remove };
 
-    return { suffixArray, inputIndex };
+  function build(entries) {
+    preprocess(entries);
+    const mappedArray = getMappedArray(entries);
+    const suffixArray = getSuffixArray(mappedArray);
+    const entryIndex = getInputIndex(entries);
 
-    function preprocess(input) {
-      for (let row of [...input]) {
+    return { suffixArray, entryIndex };
+
+    function preprocess(entries) {
+      for (let row of [...entries]) {
         if (!row.string)
-          throw new Error('Each item should have a "string" property');
+          throw new Error('Each entry should have a "string" property');
       }
     }
 
-    function getInitialArray(input) {
-      const charSet = getCharSet(input);
+    function getMappedArray(entries) {
+      const charSet = getCharSet(entries);
       const charMap = getRankedCharMap(charSet);
-      return input
+      return entries
         .map(
           ({ string }) =>
             [...string.toLowerCase()].map((char) => charMap[char]).concat([0]) //  Lower Case Search
         )
         .flat();
 
-      function getCharSet(input) {
-        const allChars = input
+      function getCharSet(entries) {
+        const allChars = entries
           .map(({ string }) => string.toLowerCase().split('')) // Lower Case Search
           .flat();
         return [...new Set(allChars)];
@@ -149,33 +155,41 @@ function autocomplete(input) {
     }
   }
 
-  function remove({ string, values, filter }) {
-    if (!values && !string && !filter) return;
-    let newInput = Object.values(JSON.parse(JSON.stringify(inputIndex)));
-    if (filter) {
-      newInput = newInput.filter(filter);
-    } else if (string) {
-      newInput = newInput.filter((row) => row.string !== string);
-    } else {
-      sortedValueStrings = values.map(val => JSON.stringify(sortProps(val)))
-      newInput = newInput.filter((row) => {
-        const sortedRow =sortProps(row);
-        return !sortedValueStrings.includes(JSON.stringify(sortedRow))
-      });
+  function remove({ strings, entries, filters }) {
+    let sortedEntryStrings;
+    if (entries) {
+      sortedEntryStrings = entries.map((entry) => JSON.stringify(sortProps(entry)));
     }
-    return autocomplete(newInput);
 
-    function sortProps(obj) {
+    let newEntries = Object.values(JSON.parse(JSON.stringify(entryIndex)));
+    newEntries = newEntries.filter((entry) => {
+      if (filters) {
+        for (let filter of filters) {
+          if (filter(entry)) return false;
+        }
+      }
+      if (strings) {
+        if (strings.includes(entry.string)) return false;
+      }
+      if (entries) {
+        const sortedEntry = JSON.stringify(sortProps(entry));
+        if (sortedEntryStrings.includes(sortedEntry)) return false;
+      }
+      return true
+      });
+    return autocompleter(newEntries);
+
+    function sortProps(entry) {
       return Object.fromEntries(
-        Object.entries(obj).sort((a, b) => (a[0] < b[0] ? -1 : 1))
+        Object.entries(entry).sort((a, b) => (a[0] < b[0] ? -1 : 1))
       );
     }
   }
 
-  function insert(input) {
-    if (!input instanceof Array) input = [input];
-    let newInput = Object.values(inputIndex).concat(input);
-    return autocomplete(newInput);
+  function insert(entries) {
+    if (!entries instanceof Array) entries = [entries];
+    let newEntries = Object.values(entryIndex).concat(entries);
+    return autocompleter(newEntries);
   }
 
   function match(query) {
@@ -262,4 +276,4 @@ function autocomplete(input) {
   }
 }
 
-export default autocomplete
+export default autocompleter;
