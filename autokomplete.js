@@ -153,8 +153,8 @@ function autocompleter(entries) {
     }
 
     function getUniqueRanks(inputArray) {
-      ranks = {};
-      currentRank = 1;
+      const ranks = {};
+      let currentRank = 1;
       for (let value of inputArray) {
         if (ranks[value]) continue;
         ranks[value] = currentRank;
