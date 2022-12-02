@@ -36,12 +36,16 @@ function autocompleter(entries) {
     function getSuffixArray(initialArray) {
       const array = initialArray.concat([0, 0]);
 
-      const [m0, m1, m2] = [0, 1, 2].map((shift) =>
-        Array.from({ length: array.length / 3 }, (_, i) => 3 * i + shift)
-      );
+    const {m12, m0} = array.reduce(({m12,m0}, _, i) => {
+      if (i >= array.length - 2) return {m12, m0}
+      if (i%3 === 0) {
+        m0.push(i)
+      } else {
+        m12.push(i)
+      }
+      return {m12, m0}
+    }, {m12: [], m0: []})
 
-      let m12 = m1.concat(m2);
-      m12 = m12.filter((i) => i + 2 < array.length);
       const m12Blocks = m12.map((i) => [i, i + 1, i + 2].map((j) => array[j]));
       const m12BlockMap = mapSequential(m12Blocks, m12);
       const sortedM12Blocks = radixSort(m12Blocks, 3);
