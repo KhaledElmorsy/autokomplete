@@ -18,45 +18,19 @@ function autocompleter(entries) {
   return { match, insert, entries: entryCopy, remove };
 
   function build(entries) {
-    preprocess(entries);
-    const mappedArray = getMappedArray(entries);
-    const suffixArray = getSuffixArray(mappedArray);
+    const charCodeArray = mapCharacterCodes(entries);
+    const suffixArray = getSuffixArray(charCodeArray);
     const entryIndex = getInputIndex(entries);
 
     return { suffixArray, entryIndex };
 
-    function preprocess(entries) {
-      for (let row of [...entries]) {
-        if (!row.string)
-          throw new Error('Each entry should have a "string" property');
-      }
-    }
-
-    function getMappedArray(entries) {
-      const charSet = getCharSet(entries);
-      const charMap = getRankedCharMap(charSet);
+    function mapCharacterCodes(entries) {
       return entries
         .map(
           ({ string }) =>
-            [...string.toLowerCase()].map((char) => charMap[char]).concat([0]) //  Lower Case Search
+            [...string.toLowerCase()].map((char) => char.charCodeAt()).concat([0]) //  Lower Case Search
         )
         .flat();
-
-      function getCharSet(entries) {
-        const allChars = entries
-          .map(({ string }) => string.toLowerCase().split('')) // Lower Case Search
-          .flat();
-        return [...new Set(allChars)];
-      }
-
-      function getRankedCharMap(charSet) {
-        const sparseUTF16Array = charSet.reduce((acc, char) => {
-          acc[char.charCodeAt()] = char;
-          return acc;
-        }, []);
-        const sortedChars = Object.values(sparseUTF16Array);
-        return getUniqueRanks(sortedChars);
-      }
     }
 
     function getSuffixArray(initialArray) {
