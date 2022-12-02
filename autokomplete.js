@@ -1,4 +1,4 @@
-import './typedef'
+import './typedef';
 
 /**
  * Build and return an autocomplete model based on an array of entry objects.
@@ -13,7 +13,7 @@ import './typedef'
  */
 function autocompleter(entries) {
   let { suffixArray, entryIndex } = build(entries);
-  const entryCopy = JSON.parse(JSON.stringify(entries))
+  const entryCopy = JSON.parse(JSON.stringify(entries));
   /** @type {string} */
   return { match, insert, entries: entryCopy, remove };
 
@@ -194,12 +194,14 @@ function autocompleter(entries) {
    *
    * Property order matters in deeper object levels, and doesn't account for function properties.
    * @param {function[]} Methods.filters Filter functions to pass each entry though and remove ones that return **true**.
-   * @returns 
+   * @returns
    */
   function remove({ strings, entries, filters }) {
     let sortedEntryStrings;
     if (entries) {
-      sortedEntryStrings = entries.map((entry) => JSON.stringify(sortProps(entry)));
+      sortedEntryStrings = entries.map((entry) =>
+        JSON.stringify(sortProps(entry))
+      );
     }
 
     let newEntries = Object.values(JSON.parse(JSON.stringify(entryIndex)));
@@ -216,7 +218,7 @@ function autocompleter(entries) {
         const sortedEntry = JSON.stringify(sortProps(entry));
         if (sortedEntryStrings.includes(sortedEntry)) return false;
       }
-      return true
+      return true;
     });
     return autocompleter(newEntries);
 
@@ -250,7 +252,7 @@ function autocompleter(entries) {
     let matches = [rowPos];
     matches = matches.concat(farmMatches(query, matchIndex));
     const uniqueMatches = [...new Set(matches)];
-    return uniqueMatches.map(rowPos => entryIndex[rowPos])
+    return uniqueMatches.map((rowPos) => entryIndex[rowPos]);
 
     function binarySearch(query, start = 0, end = suffixArray.length - 1) {
       if (start > end) return { row: null, matchIndex: -1 };
