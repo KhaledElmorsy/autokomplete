@@ -26,9 +26,8 @@ function autocompleter(entries) {
 
     function mapCharacterCodes(entries) {
       return entries
-        .map(
-          ({ string }) =>
-            [...string.toLowerCase()].map((char) => char.charCodeAt()).concat([0]) //  Lower Case Search
+        .map(({ string }) =>
+          [...string.toLowerCase()].map((char) => char.charCodeAt()).concat([0])
         )
         .flat();
     }
