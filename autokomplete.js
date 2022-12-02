@@ -36,62 +36,103 @@ function autocompleter(entries) {
     function getSuffixArray(initialArray) {
       const array = initialArray.concat([0, 0]);
 
-    const {m12, m0} = array.reduce(({m12,m0}, _, i) => {
-      if (i >= array.length - 2) return {m12, m0}
-      if (i%3 === 0) {
-        m0.push(i)
-      } else {
-        m12.push(i)
-      }
-      return {m12, m0}
-    }, {m12: [], m0: []})
-
-      const m12Blocks = m12.map((i) => [i, i + 1, i + 2].map((j) => array[j]));
-      const m12BlockMap = mapSequential(m12Blocks, m12);
-      const sortedM12Blocks = radixSort(m12Blocks, 3);
-      let sortedM12 = sortedM12Blocks.map((block) => m12BlockMap[block]);
-
-      const blockRanks = getUniqueRanks(sortedM12Blocks);
-      if (Object.values(blockRanks).length !== m12.length) {
-        const rankedM12 = m12Blocks.map((block) => blockRanks[block]);
-        const m12SuffixArray = getSuffixArray(rankedM12);
-        sortedM12 = m12SuffixArray.map((i) => m12[i]);
+      const m0 = [];
+      const m12 = [];
+      for (let i = 0; i < array.length - 1; i++) {
+        if (i % 3 === 0) {
+          m0.push(i);
+        } else {
+          m12.push(i);
+        }
       }
 
-      const indexRanks = Object.fromEntries(
-        sortedM12.map((index, i) => [index, i])
+      let { rankedM12, sortedM12, m12Ranks, duplicatesFound } = radixSortM12(
+        m12,
+        array
       );
 
-      const m0Pairs = m0.map((index) => [array[index], indexRanks[index + 1]]);
-      const m0PairMap = mapSequential(m0Pairs, m0);
-      const sortedM0Pairs = radixSort(m0Pairs, 2);
-      const sortedM0 = sortedM0Pairs.map((pair) => m0PairMap[pair]);
-
-      const suffixArray = merge(array, sortedM0, sortedM12, indexRanks);
+      if (duplicatesFound) {
+        const m12SuffixArray = getSuffixArray(rankedM12);
+        sortedM12 = m12SuffixArray.map((index) => m12[index]);
+      }
+      const sortedM0 = radixSortM0(m0, rankedM12, array);
+      const suffixArray = merge(array, sortedM0, sortedM12, m12Ranks);
       return suffixArray;
 
-      function radixSort(inputArray, size) {
-        let sortedArray = inputArray;
-        let buckets;
-        for (let i = size - 1; i >= 0; i--) {
-          buckets = [];
-          sortedArray.forEach((block) => {
-            buckets[block[i]] ||= [];
-            buckets[block[i]].push(block);
-          });
-          sortedArray = [];
-          buckets.forEach((bucket) =>
-            bucket.forEach((block) => sortedArray.push(block))
-          );
-        }
-        return sortedArray;
+      function radixSortM0(m0, rankedM12, inputArray) {
+        let buckets = [];
+        m0.forEach((index) => {
+          const value = inputArray[index];
+          if (!buckets[value]) {
+            buckets[value] = [index];
+          } else {
+            buckets[value].push[index];
+          }
+        });
+        let sortedM0 = [];
+        buckets.forEach((bucket) => {
+          if (bucket.length === 1) {
+            sortedM0.push(bucket[0]);
+          } else {
+            let tempBucket = [];
+            bucket.forEach((index) => {
+              const m12Index = index + 1 - Math.floor(i / 2);
+              const m12Rank = rankedM12[m12Index];
+              tempBucket[m12Rank] = index;
+            });
+            tempBucket.forEach((index) => sortedM0.push(index));
+          }
+        });
+        return sortedM0;
       }
 
-      function mapSequential(keys, values) {
-        return keys.reduce(
-          (acc, key, i) => ({ ...acc, ...{ [key]: values[i] } }),
-          {}
-        );
+      function radixSortM12(m12, inputArray) {
+        let sortedIndices = m12.map((index, i) => ({ originalLoc: i, index }));
+        let buckets;
+        for (let i = 2; i >= 0; i--) {
+          buckets = [];
+          sortedIndices.forEach((Obj) => {
+            const charCode = inputArray[Obj.index + i];
+            if (!buckets[charCode]) {
+              buckets[charCode] = [Obj];
+            } else {
+              buckets[charCode].push(Obj);
+            }
+          });
+          sortedIndices = [];
+          if (i === 0) break;
+          buckets.forEach((bucket) => {
+            bucket.forEach((Obj) => sortedIndices.push(Obj));
+          });
+        }
+
+        const rankedM12 = [];
+        const sortedM12 = [];
+        const m12Ranks = {};
+        let duplicatesFound = false;
+        let currentRank = 1;
+        buckets.forEach((bucket) => {
+          for (let i = 0; i < bucket.length; i++) {
+            const { originalLoc, index } = bucket[i];
+            sortedM12.push(index);
+            rankedM12[originalLoc] = currentRank;
+            m12Ranks[m12[originalLoc]] = currentRank;
+            let isDuplicate;
+            if (i !== 0) {
+              const prevIndex = bucket[i - 1].index;
+              if (
+                inputArray[prevIndex] === inputArray[index] &&
+                inputArray[prevIndex + 1] === inputArray[index + 1] &&
+                inputArray[prevIndex + 2] === inputArray[index + 2]
+              ) {
+                isDuplicate = true;
+                duplicatesFound = true;
+              }
+            }
+            if (!isDuplicate) currentRank++;
+          }
+        });
+        return { duplicatesFound, rankedM12, sortedM12, m12Ranks };
       }
 
       function merge(input, sortedM0, sortedM12, indexRanks) {
