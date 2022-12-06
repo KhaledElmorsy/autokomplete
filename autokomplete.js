@@ -15,7 +15,7 @@ function autocompleter(entries) {
   let { suffixArray, entryIndex } = build(entries);
   const entryCopy = JSON.parse(JSON.stringify(entries));
   /** @type {string} */
-  return { match, insert, entries: entryCopy, remove };
+  return { match, insert, exportModel, remove };
 
   function build(entries) {
     const charCodeArray = mapCharacterCodes(entries);
@@ -27,96 +27,98 @@ function autocompleter(entries) {
     function mapCharacterCodes(entries) {
       return entries
         .map(({ string }) =>
-          [...string.toLowerCase()].map((char) => char.charCodeAt()).concat([0])
+          [...string]
+            .map((char) => char.toLowerCase()[0]) // Special characters lengths grow when converted to lower case to store identifying symbols
+            .map((char) => char.charCodeAt())
+            .concat([0])
         )
         .flat();
     }
 
     function getSuffixArray(initialArray) {
-      const array = initialArray.concat([0, 0]);
-
+      const inputLength = initialArray.length;
       const m0 = [];
-      const m12 = [];
-      for (let i = 0; i < array.length - 1; i++) {
-        if (i % 3 === 0) {
+      const m1 = [];
+      const m2 = []
+      for (let i = 0; i < inputLength; i++) {
+        const k = i%3
+        if (k === 0) {
           m0.push(i);
+          if (i === inputLength) m1.push(i+1)
+        } else if (k === 1){
+          m1.push(i);
         } else {
-          m12.push(i);
+          m2.push(i)
         }
       }
+      const m12 = m1.concat(m2)
+      initialArray = initialArray.concat([0, 0, 0]);
 
       let { rankedM12, sortedM12, m12Ranks, duplicatesFound } = radixSortM12(
         m12,
-        array
-      );
-
+        initialArray
+        );
       if (duplicatesFound) {
-        const m12SuffixArray = getSuffixArray(rankedM12);
-        sortedM12 = m12SuffixArray.map((index) => m12[index]);
+        rankedM12 = getSuffixArray(rankedM12);
+        sortedM12 = rankedM12.map((index) => m12[index]);
+        m12Ranks = {};
+        sortedM12.forEach((index, i) => (m12Ranks[index] = i));
       }
-      const sortedM0 = radixSortM0(m0, rankedM12, array);
-      const suffixArray = merge(array, sortedM0, sortedM12, m12Ranks);
+
+      const sortedM0 = radixSortM0(m0, m12Ranks, initialArray);
+
+      const suffixArray = merge(initialArray, sortedM0, sortedM12, m12Ranks);
       return suffixArray;
 
-      function radixSortM0(m0, rankedM12, inputArray) {
+      function radixSortM0(m0, m12Ranks, inputArray) {
         let buckets = [];
         m0.forEach((index) => {
+          const rank = m12Ranks[index + 1] || 0;
+          buckets[rank] ||= []
+          buckets[rank].push(index);
+        });
+        let current = buckets;
+        buckets = [];
+        current = current.flat(1)
+        current.forEach((index) => {
           const value = inputArray[index];
-          if (!buckets[value]) {
-            buckets[value] = [index];
-          } else {
-            buckets[value].push[index];
-          }
+          buckets[value] ||= [];
+          buckets[value].push(index);
         });
         let sortedM0 = [];
-        buckets.forEach((bucket) => {
-          if (bucket.length === 1) {
-            sortedM0.push(bucket[0]);
-          } else {
-            let tempBucket = [];
-            bucket.forEach((index) => {
-              const m12Index = index + 1 - Math.floor(i / 2);
-              const m12Rank = rankedM12[m12Index];
-              tempBucket[m12Rank] = index;
-            });
-            tempBucket.forEach((index) => sortedM0.push(index));
-          }
-        });
+        buckets.forEach((bucket) =>
+          bucket.forEach((index) => sortedM0.push(index))
+        );
         return sortedM0;
       }
 
       function radixSortM12(m12, inputArray) {
-        let sortedIndices = m12.map((index, i) => ({ originalLoc: i, index }));
-        let buckets;
-        for (let i = 2; i >= 0; i--) {
-          buckets = [];
-          sortedIndices.forEach((Obj) => {
-            const charCode = inputArray[Obj.index + i];
-            if (!buckets[charCode]) {
-              buckets[charCode] = [Obj];
-            } else {
-              buckets[charCode].push(Obj);
-            }
-          });
-          sortedIndices = [];
-          if (i === 0) break;
-          buckets.forEach((bucket) => {
-            bucket.forEach((Obj) => sortedIndices.push(Obj));
-          });
+        let buckets = [];
+        m12.forEach((index, i) => {
+          const value = inputArray[index + 2] || 0;
+          buckets[value] ||= [];
+          buckets[value].push({ pos: i, index });
+        });
+        for (let i = 1; i >= 0; i--) {
+          let tempBuckets = [];
+          buckets.forEach((bucket) =>
+            bucket.forEach((Obj) => {
+              const value = inputArray[Obj.index + i] || 0;
+              tempBuckets[value] ||= [];
+              tempBuckets[value].push(Obj);
+            })
+          );
+          buckets = tempBuckets;
         }
-
         const rankedM12 = [];
         const sortedM12 = [];
         const m12Ranks = {};
         let duplicatesFound = false;
-        let currentRank = 1;
-        buckets.forEach((bucket) => {
-          for (let i = 0; i < bucket.length; i++) {
-            const { originalLoc, index } = bucket[i];
-            sortedM12.push(index);
-            rankedM12[originalLoc] = currentRank;
-            m12Ranks[m12[originalLoc]] = currentRank;
-            let isDuplicate;
+        let currentRank = 0;
+        buckets.forEach((bucket) =>
+          bucket.forEach((Obj, i) => {
+            const { pos, index } = Obj;
+            let hasDuplicate = false;
             if (i !== 0) {
               const prevIndex = bucket[i - 1].index;
               if (
@@ -124,33 +126,45 @@ function autocompleter(entries) {
                 inputArray[prevIndex + 1] === inputArray[index + 1] &&
                 inputArray[prevIndex + 2] === inputArray[index + 2]
               ) {
-                isDuplicate = true;
                 duplicatesFound = true;
+                hasDuplicate = true;
               }
             }
-            if (!isDuplicate) currentRank++;
-          }
-        });
+            if (!hasDuplicate) currentRank++;
+            sortedM12.push(index);
+            rankedM12[pos] = currentRank;
+            m12Ranks[index] = currentRank;
+          })
+        );
         return { duplicatesFound, rankedM12, sortedM12, m12Ranks };
       }
 
       function merge(input, sortedM0, sortedM12, indexRanks) {
         const sorted = [];
-        while (sortedM0.length && sortedM12.length) {
-          let m0 = sortedM0[0];
-          let m12 = sortedM12[0];
+        const m0Length = sortedM0.length;
+        const m12Length = sortedM12.length;
+        let m0Index = 0;
+        let m12Index = 0;
+        while (m0Index < m0Length && m12Index < m12Length) {
+          let m0 = sortedM0[m0Index];
+          let m12 = sortedM12[m12Index];
           const pushM0 = compare(m0, m12);
           if (pushM0) {
-            sorted.push(sortedM0.shift());
+            sorted.push(sortedM0[m0Index]);
+            m0Index++;
           } else {
-            sorted.push(sortedM12.shift());
+            sorted.push(sortedM12[m12Index]);
+            m12Index++;
           }
         }
-        return sorted.concat(sortedM0, sortedM12);
+        return sorted.concat(
+          sortedM0.slice(m0Index),
+          sortedM12.slice(m12Index)
+        );
 
         function compare(m0, m12) {
           if (m0 % 3 !== 0 && m12 % 3 !== 0) {
-            return indexRanks[m0] < indexRanks[m12];
+            return (indexRanks[m0] || 0) < (indexRanks[m12] || 0);
           }
           if (input[m0] === input[m12]) {
             return compare(m0 + 1, m12 + 1);
@@ -165,20 +179,9 @@ function autocompleter(entries) {
       const indexedInput = {};
       for (let row of input) {
         indexedInput[currIndex] = row;
-        currIndex += row.string.length + 1;
+        currIndex += [...row.string].length + 1; // Emoji's length = 2
       }
       return indexedInput;
-    }
-
-    function getUniqueRanks(inputArray) {
-      const ranks = {};
-      let currentRank = 1;
-      for (let value of inputArray) {
-        if (ranks[value]) continue;
-        ranks[value] = currentRank;
-        currentRank++;
-      }
-      return ranks;
     }
   }
 
@@ -246,6 +249,7 @@ function autocompleter(entries) {
    * @returns {entry[]}
    */
   function match(query) {
+    console.log(suffixArray.map(pos => getSuffixInfo(pos).suffix))
     query = query.toLowerCase();
     const { rowPos, matchIndex } = binarySearch(query);
     if (matchIndex === -1) return [];
@@ -273,12 +277,12 @@ function autocompleter(entries) {
       const matches = [];
       for (let i = startIndex + 1; i < suffixArray.length; i++) {
         const rowPos = matchRow(query, i);
-        if (!rowPos) break;
+        if (rowPos === undefined) break;
         matches.push(rowPos);
       }
       for (let i = startIndex - 1; i >= 0; i--) {
         const rowPos = matchRow(query, i);
-        if (!rowPos) break;
+        if (rowPos === undefined) break;
         matches.push(rowPos);
       }
       return matches;
@@ -294,8 +298,8 @@ function autocompleter(entries) {
 
     function getSuffixInfo(suffixPos) {
       const { row, rowPos } = getRow(suffixPos);
-      const string = row.string.toLowerCase(); // Lower Case Search
-      const suffix = string.slice(suffixPos - rowPos);
+      const string = [...row.string].map((char) => char.toLowerCase()[0]); // Lower Case Search
+      const suffix = string.slice(suffixPos - rowPos).join(''); // Emoji have a length of 2
       return { suffix, row, rowPos };
 
       function getRow(suffixPos) {
