@@ -12,19 +12,28 @@ import './typedef';
  * @returns {autocompleter}
  */
 function autocompleter(entries) {
-  let { suffixArray, entryIndex } = build(entries);
-  const entryCopy = JSON.parse(JSON.stringify(entries));
-  /** @type {string} */
-  return { match, insert, exportModel, remove };
+  let { suffixArray, entryIndex, mappedChars } = build(entries);
+
+  return { match, insert, remove };
 
   function build(entries) {
-    const charCodeArray = mapCharacterCodes(entries);
+    const charArray = getCharacterArray(entries);
+    const charCodeArray = charArray.map(char => char.charCodeAt());
     const suffixArray = getSuffixArray(charCodeArray);
     const entryIndex = getInputIndex(entries);
+    const mappedChars = mapCharacterArray(charArray, entryIndex)
 
-    return { suffixArray, entryIndex };
+    return { suffixArray, entryIndex, mappedChars };
 
-    function mapCharacterCodes(entries) {
+    function mapCharacterArray(charArray, entryIndex) {
+      let currentEntryIndex;
+      return charArray.map((char,i) => {
+        if (entryIndex[i]) currentEntryIndex = i;
+        return {c: char, e: currentEntryIndex} // {Character: char, Entry: i}
+      })
+    }
+
+    function getCharacterArray(entries) {
       return entries
         .map(({ string }) =>
           [...string]
@@ -249,87 +258,75 @@ function autocompleter(entries) {
    * @returns {entry[]}
    */
   function match(query) {
-    console.log(suffixArray.map(pos => getSuffixInfo(pos).suffix))
     query = query.toLowerCase();
-    const { rowPos, matchIndex } = binarySearch(query);
+    const matchIndex = binarySearch(query);
     if (matchIndex === -1) return [];
-    let matches = [rowPos];
-    matches = matches.concat(farmMatches(query, matchIndex));
-    const uniqueMatches = [...new Set(matches)];
-    return uniqueMatches.map((rowPos) => entryIndex[rowPos]);
+    const matches = {};
+    const firstMatch = getChar(suffixArray[matchIndex]).e
+    matches[firstMatch] = 1;
+    farmMatches(query, matchIndex, matches);
+    return Object.keys(matches).map(entry => entryIndex[entry]);
 
     function binarySearch(query, start = 0, end = suffixArray.length - 1) {
-      if (start > end) return { row: null, matchIndex: -1 };
+      if (start > end) return -1;
       const midpoint = start + ((end - start) >> 1);
       const suffixPos = suffixArray[midpoint];
-      const { suffix, rowPos } = getSuffixInfo(suffixPos);
-      const suffixMatches = matchSuffix(query, suffix);
-      if (suffixMatches) {
-        return { rowPos, matchIndex: midpoint };
+      const {lcp, nextChar, isMatched} = getLCP(query, suffixPos, true)
+      if (isMatched) {
+        return midpoint
       } else {
         [start, end] =
-          query < suffix ? [start, midpoint - 1] : [midpoint + 1, end];
+          query < lcp + nextChar ? [start, midpoint - 1] : [midpoint + 1, end];
         return binarySearch(query, start, end);
       }
     }
 
-    function farmMatches(query, startIndex) {
-      const matches = [];
+    function farmMatches(query, startIndex, matches) {
       for (let i = startIndex + 1; i < suffixArray.length; i++) {
-        const rowPos = matchRow(query, i);
-        if (rowPos === undefined) break;
-        matches.push(rowPos);
+        const suffixPos = suffixArray[i];
+        const charEntry = getChar(suffixPos).e;
+        if (matches[charEntry]) continue;
+        const {isMatched} = getLCP(query, suffixPos);
+        if(isMatched) {
+          matches[charEntry] = 1
+        } else {
+          break;
+        }
       }
       for (let i = startIndex - 1; i >= 0; i--) {
-        const rowPos = matchRow(query, i);
-        if (rowPos === undefined) break;
-        matches.push(rowPos);
+        const suffixPos = suffixArray[i];
+        const charEntry = getChar(suffixPos).e;
+        if (matches[charEntry]) continue;
+        const {isMatched} = getLCP(query, suffixPos);
+        if(isMatched) {
+          matches[charEntry] = 1
+        } else {
+          break;
+        }
       }
       return matches;
-
-      function matchRow(query, index) {
-        const suffixPos = suffixArray[index];
-        const { rowPos, suffix } = getSuffixInfo(suffixPos);
-        if (matchSuffix(query, suffix)) {
-          return rowPos;
-        }
-      }
     }
 
-    function getSuffixInfo(suffixPos) {
-      const { row, rowPos } = getRow(suffixPos);
-      const string = [...row.string].map((char) => char.toLowerCase()[0]); // Lower Case Search
-      const suffix = string.slice(suffixPos - rowPos).join(''); // Emoji have a length of 2
-      return { suffix, row, rowPos };
-
-      function getRow(suffixPos) {
-        let rowPos = suffixPos;
-        let row;
-        while (!(row = entryIndex[rowPos])) {
-          rowPos--;
-        }
-        return { rowPos, row };
-      }
+    function getChar(suffixPos, shift = 0) {
+      const charIndex = suffixPos + shift
+      return mappedChars[charIndex]
     }
 
-    function matchSuffix(query, suffix) {
-      const lcp = getLCP(query, suffix);
-      return lcp === query;
-
-      function getLCP(...strings) {
-        let lcp = strings[0] || '';
-        for (let string of strings.slice(1)) {
-          for (let [i, char] of [...lcp].entries()) {
-            if (char !== string[i]) {
-              lcp = lcp.slice(0, i);
-              break;
-            }
-          }
-          if (!lcp) break;
+     function getLCP(query, suffixPos, getNext = false) {
+      let lcp = '';
+      let isMatched = true;
+      let nextChar;
+      for (let i = 0; i < query.length; i++) {
+        if (query[i] !== getChar(suffixPos, i).c) {
+          isMatched = false;
+          if (getNext) nextChar = getChar(suffixPos, i).c
+          break;
         }
-        return lcp;
+        lcp = lcp.concat(query[i]);
       }
-    }
+      return {lcp, isMatched, nextChar}
+     }
+    
   }
 }
 
