@@ -12,7 +12,7 @@ import './typedef';
  * @returns {autocompleter}
  */
 function autocompleter(entries) {
-  let { suffixArray, entryIndex, mappedChars } = build(entries);
+  let { suffixArray, entryIndex, suffixArrayEntries, charArray } = build(entries);
 
   return { match, insert, remove };
 
@@ -21,9 +21,10 @@ function autocompleter(entries) {
     const charCodeArray = charArray.map(char => char.charCodeAt());
     const suffixArray = getSuffixArray(charCodeArray);
     const entryIndex = getInputIndex(entries);
-    const mappedChars = mapCharacterArray(charArray, entryIndex)
+    const mappedChars = mapCharacterArray(charArray, entryIndex);
+    const suffixArrayEntries = suffixArray.map(pos => mappedChars[pos].e)
 
-    return { suffixArray, entryIndex, mappedChars };
+    return { suffixArray, entryIndex, suffixArrayEntries, charArray };
 
     function mapCharacterArray(charArray, entryIndex) {
       let currentEntryIndex;
@@ -38,8 +39,7 @@ function autocompleter(entries) {
         .map(({ string }) =>
           [...string]
             .map((char) => char.toLowerCase()[0]) // Special characters lengths grow when converted to lower case to store identifying symbols
-            .map((char) => char.charCodeAt())
-            .concat([0])
+            .concat(['\x00']) // Add a character that'll map to zero after each string
         )
         .flat();
     }
@@ -259,75 +259,60 @@ function autocompleter(entries) {
    */
   function match(query) {
     query = query.toLowerCase();
-    const matchIndex = binarySearch(query);
-    if (matchIndex === -1) return [];
-    const matches = {};
-    const firstMatch = getChar(suffixArray[matchIndex]).e
-    matches[firstMatch] = 1;
-    farmMatches(query, matchIndex, matches);
-    return Object.keys(matches).map(entry => entryIndex[entry]);
+    const firstMatch = binarySearch(query);
+    const lastMatch = binarySearch(query, {lastMatch: true});
+    return getEntries(firstMatch, lastMatch)
 
-    function binarySearch(query, start = 0, end = suffixArray.length - 1) {
+    function binarySearch(query, {start = 0, end = suffixArray.length - 1,lastMatch = false} = {}) {
       if (start > end) return -1;
       const midpoint = start + ((end - start) >> 1);
       const suffixPos = suffixArray[midpoint];
       const {lcp, nextChar, isMatched} = getLCP(query, suffixPos, true)
       if (isMatched) {
-        return midpoint
+        const neighborShift = lastMatch? 1 : -1
+        const neighborIndex = midpoint + neighborShift;
+        if (neighborIndex > suffixArray.length - 1 || neighborIndex < 0) {
+          return midpoint
+        }
+        const neighborPos = suffixArray[neighborIndex];
+        const neighborMatch = getLCP(query, neighborPos);
+        if (!neighborMatch.isMatched) return midpoint;
+        [start, end] = lastMatch? [midpoint + 1, end] : [start, midpoint - 1]
+        return binarySearch(query, {start, end, lastMatch})
       } else {
         [start, end] =
           query < lcp + nextChar ? [start, midpoint - 1] : [midpoint + 1, end];
-        return binarySearch(query, start, end);
+        return binarySearch(query, {start, end, lastMatch});
       }
     }
-
-    function farmMatches(query, startIndex, matches) {
-      for (let i = startIndex + 1; i < suffixArray.length; i++) {
-        const suffixPos = suffixArray[i];
-        const charEntry = getChar(suffixPos).e;
-        if (matches[charEntry]) continue;
-        const {isMatched} = getLCP(query, suffixPos);
-        if(isMatched) {
-          matches[charEntry] = 1
-        } else {
-          break;
-        }
-      }
-      for (let i = startIndex - 1; i >= 0; i--) {
-        const suffixPos = suffixArray[i];
-        const charEntry = getChar(suffixPos).e;
-        if (matches[charEntry]) continue;
-        const {isMatched} = getLCP(query, suffixPos);
-        if(isMatched) {
-          matches[charEntry] = 1
-        } else {
-          break;
-        }
-      }
-      return matches;
-    }
-
-    function getChar(suffixPos, shift = 0) {
-      const charIndex = suffixPos + shift
-      return mappedChars[charIndex]
-    }
-
-     function getLCP(query, suffixPos, getNext = false) {
+    
+    function getLCP(query, suffixPos, getNext = false) {
       let lcp = '';
       let isMatched = true;
       let nextChar;
       for (let i = 0; i < query.length; i++) {
-        if (query[i] !== getChar(suffixPos, i).c) {
+        const suffixChar = charArray[suffixPos + i]
+        if (query[i] !== suffixChar) {
           isMatched = false;
-          if (getNext) nextChar = getChar(suffixPos, i).c
+          if (getNext) nextChar = suffixChar
           break;
         }
-        lcp = lcp.concat(query[i]);
+        lcp = lcp.concat(suffixChar);
       }
       return {lcp, isMatched, nextChar}
      }
-    
+
+     function getEntries(start, end) {
+      const matchedIDs = new Set()
+      const entries = [];
+      suffixArrayEntries.slice(start, end +1).forEach((entryID) => {
+        if (matchedIDs.has(entryID)) return;
+        matchedIDs.add(entryID)
+        entries.push(entryIndex[entryID])
+      })
+      return entries
+     }
+    }
   }
-}
 
 export default autocompleter;
