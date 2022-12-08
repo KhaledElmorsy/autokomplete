@@ -22,5 +22,8 @@
   "bugs": {
     "url": "https://github.com/kha-ld/autokomplete/issues"
   },
-  "homepage": "https://github.com/kha-ld/autokomplete#readme"
+  "homepage": "https://github.com/kha-ld/autokomplete#readme",
+  "devDependencies": {
+    "jest": "^29.3.1"
+  }
 }
