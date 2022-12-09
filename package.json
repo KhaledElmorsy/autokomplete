@@ -1,6 +1,6 @@
 {
   "name": "autokomplete",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "A fast, lightweight autocomplete module that linearly scales with large amounts of data",
   "main": "lib/index.js",
   "scripts": {
