@@ -4,7 +4,8 @@
   "description": "A fast, lightweight autocomplete module that linearly scales with large amounts of data",
   "main": "lib/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "watch": "NODE_OPTIONS=--experimental-vm-modules npx jest --watchAll",
+    "test": "NODE_OPTIONS=--experimental-vm-modules npx jest && exit 1"
   },
   "repository": {
     "type": "git",
@@ -18,6 +19,7 @@
     "immutable"
   ],
   "author": "kha-ld",
+  "type": "module",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/kha-ld/autokomplete/issues"
