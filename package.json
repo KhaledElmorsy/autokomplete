@@ -3,6 +3,9 @@
   "version": "0.0.4",
   "description": "A fast, lightweight autocomplete module that linearly scales with large amounts of data",
   "main": "lib/index.js",
+  "files": [
+    "/lib"
+  ],
   "scripts": {
     "watch": "NODE_OPTIONS=--experimental-vm-modules npx jest --watchAll",
     "test": "NODE_OPTIONS=--experimental-vm-modules npx jest && exit 1"
